@@ -15,7 +15,7 @@
     system = "x86_64-linux";
     pkgs = import nixpkgs {
       inherit system;
-      overlays = [inputs.overlays.wine-10_4];
+      overlays = [inputs.wine-overlays.overlays.wine-10_4];
     };
   in {
     packages = {
