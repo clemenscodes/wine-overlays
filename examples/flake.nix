@@ -3,6 +3,9 @@
     nixpkgs = {
       url = "github:NixOS/nixpkgs/nixos-unstable";
     };
+    wine-overlays = {
+      url = "github:clemenscodes/wine-overlays";
+    };
   };
   outputs = {
     self,
@@ -10,14 +13,11 @@
     ...
   } @ inputs: let
     system = "x86_64-linux";
-    overlays = import ./overlays {inherit self pkgs;};
-    lib = import ./lib {inherit pkgs;};
     pkgs = import nixpkgs {
       inherit system;
-      overlays = [overlays.wine-10_4];
+      overlays = [inputs.overlays.wine-10_4];
     };
   in {
-    inherit lib overlays;
     packages = {
       ${system} = {
         wine-staging-10_4 = pkgs."wine-staging-10.4";
