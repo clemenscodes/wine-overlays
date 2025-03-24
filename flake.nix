@@ -3,6 +3,9 @@
     nixpkgs = {
       url = "github:NixOS/nixpkgs/nixos-unstable";
     };
+    nix-gaming = {
+      url = "github:fufexan/nix-gaming";
+    };
   };
   outputs = {
     self,
@@ -20,6 +23,7 @@
     inherit lib overlays;
     packages = {
       ${system} = {
+        inherit (inputs.nix-gaming.packages.${system}) wine-ge wine-osu wine-tkg;
         wine-staging-10_4 = pkgs."wine-staging-10.4";
         wine64-staging-10_4 = pkgs."wine64-staging-10.4";
         wine64-staging-winetricks-10_4 = pkgs."wine64-staging-winetricks-10.4";
