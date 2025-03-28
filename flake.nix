@@ -15,6 +15,9 @@
         };
       };
     };
+    chaotic = {
+      url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
+    };
   };
   outputs = {
     self,
@@ -32,7 +35,15 @@
     inherit lib overlays;
     packages = {
       ${system} = {
-        inherit (inputs.nix-gaming.packages.${system}) wine-ge wine-osu wine-tkg;
+        inherit
+          (inputs.nix-gaming.packages.${system})
+          wine-ge
+          wine-osu
+          wine-tkg
+          wineprefix-preparer
+          winetricks-git
+          umu-launcher
+          ;
         wine-staging-10_4 = pkgs."wine-staging-10.4";
         wine64-staging-10_4 = pkgs."wine64-staging-10.4";
         wine64-staging-winetricks-10_4 = pkgs."wine64-staging-winetricks-10.4";
