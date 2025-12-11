@@ -1,8 +1,4 @@
-{
-  self,
-  pkgs,
-  ...
-}: {
+{self, ...}: {
   wine-10_4 = (
     final: prev: let
       version = "10.4";
@@ -22,4 +18,7 @@
     in
       self.lib.mkWinePkgs {inherit final prev version src patch;}
   );
+  wine = final: prev: {
+    wine = prev.callPackage self.lib.mkWineWinetricks {wine = prev.wineWow64Packages.stagingFull;};
+  };
 }
