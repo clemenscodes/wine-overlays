@@ -20,15 +20,18 @@
     inherit lib overlays;
     packages = {
       ${system} = {
-        inherit (pkgs) wine;
+        inherit (pkgs) wine winetricks-compat;
       };
     };
     devShells = {
       ${system} = {
         default = pkgs.mkShell {
-          buildInputs = with self.packages.${system}; [
-            wine
-          ];
+          buildInputs = with self.packages.${system};
+            [
+              wine
+              winetricks-compat
+            ]
+            ++ (with pkgs; [winetricks]);
         };
       };
     };

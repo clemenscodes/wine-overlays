@@ -84,7 +84,6 @@
       installPhase = ''
         mkdir -p $out/bin
         ln -s ${wine}/bin/wine $out/bin/wine64
-        ln -s ${wine}/bin/wine $out/bin/wine
       '';
     };
 }

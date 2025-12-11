@@ -19,6 +19,7 @@
       self.lib.mkWinePkgs {inherit final prev version src patch;}
   );
   wine = final: prev: {
-    wine = prev.callPackage self.lib.mkWineWinetricks {wine = prev.wineWow64Packages.stagingFull;};
+    winetricks-compat = prev.callPackage self.lib.mkWineWinetricks {inherit (final) wine;};
+    wine = prev.wineWow64Packages.stagingFull;
   };
 }
