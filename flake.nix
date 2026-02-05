@@ -14,13 +14,23 @@
     lib = import ./lib {inherit pkgs;};
     pkgs = import nixpkgs {
       inherit system;
-      overlays = [overlays.wine];
+      overlays = [
+        overlays.wine-10_18
+        overlays.wine-11_0
+        overlays.wine
+      ];
     };
   in {
     inherit lib overlays;
     packages = {
       ${system} = {
-        inherit (pkgs) wine winetricks-compat;
+        wine-10_18 = pkgs."wine-wow64-staging-10.18";
+        wine-11_0 = pkgs."wine-wow64-staging-11.0";
+        inherit
+          (pkgs)
+          wine
+          winetricks-compat
+          ;
       };
     };
     devShells = {
@@ -28,8 +38,10 @@
         default = pkgs.mkShell {
           buildInputs = with self.packages.${system};
             [
-              wine
-              winetricks-compat
+              # wine
+              # winetricks-compat
+              # wine-10_18
+              wine-11_0
             ]
             ++ (with pkgs; [winetricks]);
         };
