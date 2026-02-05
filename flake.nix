@@ -17,7 +17,6 @@
       overlays = [
         overlays.wine-10_18
         overlays.wine-11_0
-        overlays.wine
       ];
     };
   in {
@@ -25,12 +24,9 @@
     packages = {
       ${system} = {
         wine-10_18 = pkgs."wine-wow64-staging-10.18";
+        winetricks-compat-10_18 = pkgs."wine-wow64-staging-winetricks-10.18";
         wine-11_0 = pkgs."wine-wow64-staging-11.0";
-        inherit
-          (pkgs)
-          wine
-          winetricks-compat
-          ;
+        winetricks-compat-11_0 = pkgs."wine-wow64-staging-winetricks-11.0";
       };
     };
     devShells = {
@@ -38,10 +34,8 @@
         default = pkgs.mkShell {
           buildInputs = with self.packages.${system};
             [
-              # wine
-              # winetricks-compat
               # wine-10_18
-              wine-11_0
+              # wine-11_0
             ]
             ++ (with pkgs; [winetricks]);
         };
