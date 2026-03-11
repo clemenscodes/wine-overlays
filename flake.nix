@@ -18,6 +18,7 @@
         overlays.wine-10_18
         overlays.wine-11_0
         overlays.wine-11_2
+        overlays.wine-11_4
       ];
     };
   in {
@@ -30,6 +31,8 @@
         winetricks-compat-11_0 = pkgs."wine-wow64-staging-winetricks-11.0";
         wine-11_2 = pkgs."wine-wow64-staging-11.2";
         winetricks-compat-11_2 = pkgs."wine-wow64-staging-winetricks-11.2";
+        wine-11_4 = pkgs."wine-wow64-staging-11.4";
+        winetricks-compat-11_4 = pkgs."wine-wow64-staging-winetricks-11.4";
       };
     };
     devShells = {
@@ -39,7 +42,8 @@
             [
               # wine-10_18
               # wine-11_0
-              wine-11_2
+              # wine-11_2
+              wine-11_4
             ]
             ++ (with pkgs; [winetricks]);
         };

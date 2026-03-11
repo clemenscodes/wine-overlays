@@ -56,6 +56,25 @@
     in
       self.lib.mkWinePkgs {inherit final prev version src patch;}
   );
+  wine-11_4 = (
+    final: prev: let
+      version = "11.4";
+      src = prev.fetchurl rec {
+        inherit version;
+        url = "https://dl.winehq.org/wine/source/11.x/wine-${version}.tar.xz";
+        hash = "sha256-GXCkY4HTvCxE1lHQgzY3Dkme64tT3JPL0c5UT3EV5Zg=";
+      };
+      patch = prev.fetchFromGitLab rec {
+        inherit version;
+        hash = "sha256-m7QrHWaRkoWSdaj4rwuZznjM8mrkxHGEqVSLZTKf4pU=";
+        domain = "gitlab.winehq.org";
+        owner = "wine";
+        repo = "wine-staging";
+        rev = "v${version}";
+      };
+    in
+      self.lib.mkWinePkgs {inherit final prev version src patch;}
+  );
   wine = final: prev: {
     winetricks-compat = prev.callPackage self.lib.mkWineWinetricks {inherit (final) wine;};
     wine = prev.wineWow64Packages.stagingFull;
