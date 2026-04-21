@@ -43,14 +43,18 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "path": "../",
-        "type": "path"
+        "lastModified": 1776751032,
+        "narHash": "sha256-ZCfo+8+jzIlgUHZPpYJeh/ovmw7osq21kQLAS6gE0HA=",
+        "owner": "clemenscodes",
+        "repo": "wine-overlays",
+        "rev": "6f87fb38eacb9149cd491ef585c77ad820271e0a",
+        "type": "github"
       },
       "original": {
-        "path": "../",
-        "type": "path"
-      },
-      "parent": []
+        "owner": "clemenscodes",
+        "repo": "wine-overlays",
+        "type": "github"
+      }
     }
   },
   "root": "root",
