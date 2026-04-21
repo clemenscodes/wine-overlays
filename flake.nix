@@ -4,50 +4,52 @@
       url = "github:NixOS/nixpkgs/nixos-unstable";
     };
   };
-  outputs = {
-    self,
-    nixpkgs,
-    ...
-  }: let
-    system = "x86_64-linux";
-    overlays = import ./overlays {inherit self pkgs;};
-    lib = import ./lib {inherit pkgs;};
-    pkgs = import nixpkgs {
-      inherit system;
-      overlays = [
-        overlays.wine-10_18
-        overlays.wine-11_0
-        overlays.wine-11_2
-        overlays.wine-11_4
+  outputs =
+    {
+      self,
+      nixpkgs,
+      ...
+    }:
+    let
+      toSuffix = v: builtins.replaceStrings [ "." ] [ "_" ] v;
+      wineVersions = [
+        "10.18"
+        "11.0"
+        "11.2"
+        "11.4"
+        "11.7"
       ];
-    };
-  in {
-    inherit lib overlays;
-    packages = {
-      ${system} = {
-        wine-10_18 = pkgs."wine-wow64-staging-10.18";
-        winetricks-compat-10_18 = pkgs."wine-wow64-staging-winetricks-10.18";
-        wine-11_0 = pkgs."wine-wow64-staging-11.0";
-        winetricks-compat-11_0 = pkgs."wine-wow64-staging-winetricks-11.0";
-        wine-11_2 = pkgs."wine-wow64-staging-11.2";
-        winetricks-compat-11_2 = pkgs."wine-wow64-staging-winetricks-11.2";
-        wine-11_4 = pkgs."wine-wow64-staging-11.4";
-        winetricks-compat-11_4 = pkgs."wine-wow64-staging-winetricks-11.4";
+      system = "x86_64-linux";
+      overlays = import ./overlays { inherit self; };
+      pkgs = import nixpkgs {
+        inherit system;
+        overlays = map (v: overlays."wine-${toSuffix v}") wineVersions;
       };
-    };
-    devShells = {
-      ${system} = {
-        default = pkgs.mkShell {
-          buildInputs = with self.packages.${system};
-            [
-              # wine-10_18
-              # wine-11_0
-              # wine-11_2
-              wine-11_4
-            ]
-            ++ (with pkgs; [winetricks]);
+      lib = import ./lib { inherit pkgs; };
+      winePackages = builtins.foldl' (
+        acc: v: acc // { "wine-${toSuffix v}" = pkgs."wine-${toSuffix v}"; }
+      ) { } wineVersions;
+    in
+    {
+      inherit lib overlays;
+      packages = {
+        ${system} = winePackages;
+      };
+      devShells = {
+        ${system} = {
+          default = pkgs.mkShell {
+            buildInputs =
+              with self.packages.${system};
+              [
+                # wine-10_18
+                # wine-11_0
+                # wine-11_2
+                # wine-11_4
+                wine-11_7
+              ]
+              ++ (with pkgs; [ winetricks ]);
+          };
         };
       };
     };
-  };
 }

@@ -7,6 +7,7 @@
     patch,
     ...
   }: let
+    v = builtins.replaceStrings ["."] ["_"] version;
     selfBuildInputs = self:
       [
         pkgs.perl
@@ -33,57 +34,14 @@
       }
     '';
   in {
-    "wine-staging-${version}" = prev.winePackages.stagingFull.overrideAttrs (self: {
+    "wine-${v}" = prev.wineWow64Packages.stagingFull.overrideAttrs (self: {
       inherit version src;
       buildInputs = selfBuildInputs self;
       nativeBuildInputs = selfNativeBuildInputs self;
       prePatch = prePatch patch pkgs;
-    });
-    "wine64-staging-${version}" = prev.wine64Packages.stagingFull.overrideAttrs (self: {
-      inherit version src;
-      buildInputs = selfBuildInputs self;
-      nativeBuildInputs = selfNativeBuildInputs self;
-      prePatch = prePatch patch pkgs;
-    });
-    "wine64-staging-winetricks-${version}" = prev.stdenv.mkDerivation {
-      name = "wine64-staging-winetricks-${version}";
-      phases = "installPhase";
-      installPhase = ''
-        mkdir -p $out/bin
-        ln -s ${final."wine64-staging-${version}"}/bin/wine $out/bin/wine64
+      postInstall = (self.postInstall or "") + ''
+        ln -sf $out/bin/wine $out/bin/wine64
       '';
-    };
-    "wine-wow-staging-${version}" = prev.wineWowPackages.stagingFull.overrideAttrs (self: {
-      inherit version src;
-      buildInputs = selfBuildInputs self;
-      nativeBuildInputs = selfNativeBuildInputs self;
-      prePatch = prePatch patch pkgs;
     });
-    "wine-wow64-staging-${version}" = prev.wineWow64Packages.stagingFull.overrideAttrs (self: {
-      inherit version src;
-      buildInputs = selfBuildInputs self;
-      nativeBuildInputs = selfNativeBuildInputs self;
-      prePatch = prePatch patch pkgs;
-    });
-    "wine-wow64-staging-winetricks-${version}" = prev.stdenv.mkDerivation {
-      name = "wine-wow64-staging-winetricks-${version}";
-      phases = "installPhase";
-      installPhase = ''
-        mkdir -p $out/bin
-        ln -s ${final."wine-wow64-staging-${version}"}/bin/wine $out/bin/wine64
-      '';
-    };
   };
-  mkWineWinetricks = {
-    stdenv,
-    wine,
-  }:
-    stdenv.mkDerivation {
-      inherit (wine) name;
-      phases = "installPhase";
-      installPhase = ''
-        mkdir -p $out/bin
-        ln -s ${wine}/bin/wine $out/bin/wine64
-      '';
-    };
 }
