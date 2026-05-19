@@ -18,6 +18,8 @@
         "11.2"
         "11.4"
         "11.7"
+        "11.8"
+        "11.9"
       ];
       system = "x86_64-linux";
       overlays = import ./overlays { inherit self; };
@@ -45,7 +47,9 @@
                 # wine-11_0
                 # wine-11_2
                 # wine-11_4
-                wine-11_7
+                # wine-11_7
+                # wine-11_8
+                wine-11_9
               ]
               ++ (with pkgs; [ winetricks ]);
           };

@@ -48,7 +48,17 @@ in {
     srcHash = "sha256-sBqyHHn+3mx71THUadma/Z3N9T6ymviK2sajMutDX58=";
     patchHash = "sha256-EjAmwSZu/Q/8QfFERnV5iz1n5CsWPneBHflQDaD4LAc=";
   };
-  wine = _final: prev: {
+  wine-11_8 = mkWineOverlay {
+    version = "11.8";
+    srcHash = "sha256-U6qFmV1Ll/ARahxWuKahQXcw71mid4GdLT0xNk6lVrA=";
+    patchHash = "sha256-lW5dfCfsB+z84mlLpfmkR7QDxmhL+RcBufSftUutHto=";
+  };
+  wine-11_9 = mkWineOverlay {
+    version = "11.9";
+    srcHash = "sha256-45zBjbKHNYokNvivSYvtx+RE1V65nvVFtg53i7TqD28=";
+    patchHash = "sha256-IQSu/Nr3JynVv95/jaZCZrCQWKE8/pp9JGEwfmDdI9s=";
+  };
+  wine =_final: prev: {
     wine = prev.wineWow64Packages.stagingFull.overrideAttrs (self: {
       postInstall = (self.postInstall or "") + ''
         ln -sf $out/bin/wine $out/bin/wine64
