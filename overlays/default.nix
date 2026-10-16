@@ -58,6 +58,56 @@ in {
     srcHash = "sha256-45zBjbKHNYokNvivSYvtx+RE1V65nvVFtg53i7TqD28=";
     patchHash = "sha256-IQSu/Nr3JynVv95/jaZCZrCQWKE8/pp9JGEwfmDdI9s=";
   };
+  wine-11_10 = mkWineOverlay {
+    version = "11.10";
+    srcHash = "sha256-5MNevib0+O718hQ+JKH7n9ED8dRhMq1HVUeSJ9CGuOc=";
+    patchHash = "sha256-KzWZv5ljHp97FqVmoOQNQ+qhXnGK1S7uz0CtOZFGAgA=";
+  };
+  wine-11_11 = mkWineOverlay {
+    version = "11.11";
+    srcHash = "sha256-V9/ZZEi/GV78GxOGExw7oV1LLZ+vL+ujFOg9dD02040=";
+    patchHash = "sha256-Seg8A8zppBUTyCx8U0SOpzWpyHtucCTCemHFzAUcozE=";
+  };
+  wine-11_12 = mkWineOverlay {
+    version = "11.12";
+    srcHash = "sha256-07wJEZLZhYRsnyAGXMgfITMfAeIrc2sTHjRJ4TBmcbw=";
+    patchHash = "sha256-3pE/RVUvH56z9Ilumokl7nNMrhfksuUWzKq6k8behW4=";
+  };
+  wine-11_13 = mkWineOverlay {
+    version = "11.13";
+    srcHash = "sha256-lUg5DFBCEmtuzwryy6R3t1qj6ZvpeX6nDVAmN0xQdPE=";
+    patchHash = "sha256-btsPAspaUDuTaESbyaEKMEqQD+74KZZT0iNuFYD7TO0=";
+  };
+  wine-11_14 = mkWineOverlay {
+    version = "11.14";
+    srcHash = "sha256-BrO9hyrg1NRUuaDAB3JydwFyDeGE02xoWXCIA4ET7cQ=";
+    patchHash = "sha256-Xat/Xp6FcY4MVQjxz2lp36+tnlu7hoHoQw5WpZDOa2E=";
+  };
+  wine-11_15 = mkWineOverlay {
+    version = "11.15";
+    srcHash = "sha256-UEbzba4hCxmOppeSd01EAf7tl11GXspsJRyTlEAOwnI=";
+    patchHash = "sha256-/mu7seIsrkXzfJjIzyrMavBT6ZC8Gz/6PZPm9TjjekE=";
+  };
+  wine-11_16 = mkWineOverlay {
+    version = "11.16";
+    srcHash = "sha256-xm4gkDQ9zXJ/f3/S+H7gv7CxGHkMHXRat7ikw6QZfy8=";
+    patchHash = "sha256-14VEZMMlWCsStm2AJNO+wBPPO67EGDsQyNiFBBtIcUg=";
+  };
+  wine-11_17 = mkWineOverlay {
+    version = "11.17";
+    srcHash = "sha256-jnUuKbuikBrZ+RUTk0XG7mcYSwmdQlcE2RWXHKXAVfw=";
+    patchHash = "sha256-VSYkI9XTU8Lg5UooZBlRXVQ9hVJ+YdoRr5GAc+jBDsI=";
+  };
+  wine-11_18 = mkWineOverlay {
+    version = "11.18";
+    srcHash = "sha256-xigvbU2uzxHzq5+aK2xZj2e+fijDY7osroo8RLYR56Q=";
+    patchHash = "sha256-KZCkra0y3XFNrbD2lZ+YUCLyq1POC30Sd4sGCJZuwgQ=";
+  };
+  wine-11_19 = mkWineOverlay {
+    version = "11.19";
+    srcHash = "sha256-SCAGbtpo5VPTMCOf/GKBZKNI0cYj5J0FjgEcWnzalfE=";
+    patchHash = "sha256-Dnb/CjzxWDdMDXfJB/hiWHhQLjU49F6OyM6qqC0g/v0=";
+  };
   wine =_final: prev: {
     wine = prev.wineWow64Packages.stagingFull.overrideAttrs (self: {
       postInstall = (self.postInstall or "") + ''
