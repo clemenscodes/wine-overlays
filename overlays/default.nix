@@ -1,6 +1,6 @@
 {self, ...}: let
   splitDot = s: builtins.filter builtins.isString (builtins.split "\\." s);
-  mkWineOverlay = {version, srcHash, patchHash}: let
+  mkWineOverlay = {version, srcHash, patchHash, extraPatches ? []}: let
     parts = splitDot version;
     major = builtins.head parts;
     minor = builtins.elemAt parts 1;
@@ -21,7 +21,7 @@
         rev = "v${version}";
       };
     in
-      self.lib.mkWinePkgs {inherit final prev version src patch;};
+      self.lib.mkWinePkgs {inherit final prev version src patch extraPatches;};
 in {
   wine-10_18 = mkWineOverlay {
     version = "10.18";
@@ -107,6 +107,18 @@ in {
     version = "11.19";
     srcHash = "sha256-SCAGbtpo5VPTMCOf/GKBZKNI0cYj5J0FjgEcWnzalfE=";
     patchHash = "sha256-Dnb/CjzxWDdMDXfJB/hiWHhQLjU49F6OyM6qqC0g/v0=";
+    extraPatches = [
+      # Reject a stream connect() to destination port 0 with WSAEADDRNOTAVAIL,
+      # like Windows. Fixes the in-game Battle.net web login hanging under Wine
+      # (the browser self-connects to http://localhost:0/?ST=... instead of
+      # failing fast, so the session ticket is never harvested). See the patch
+      # header for the full root-cause analysis.
+      ../patches/reject-connect-port0.patch
+      # winex11: sync Win32 visibility when another X client withdraws/maps a
+      # managed window, so an external unmap is not silently reverted by the
+      # next SetWindowPos. Repro + analysis in ~/.local/src/wine-external-unmap-repro.
+      ../patches/0001-winex11-sync-win32-visibility-on-external-withdraw-map.patch
+    ];
   };
   wine =_final: prev: {
     wine = prev.wineWow64Packages.stagingFull.overrideAttrs (self: {

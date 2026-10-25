@@ -5,6 +5,7 @@
     version,
     src,
     patch,
+    extraPatches ? [],
     ...
   }: let
     v = builtins.replaceStrings ["."] ["_"] version;
@@ -39,6 +40,7 @@
       buildInputs = selfBuildInputs self;
       nativeBuildInputs = selfNativeBuildInputs self;
       prePatch = prePatch patch pkgs;
+      patches = (self.patches or []) ++ extraPatches;
       postInstall = (self.postInstall or "") + ''
         ln -sf $out/bin/wine $out/bin/wine64
       '';

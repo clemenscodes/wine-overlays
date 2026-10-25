@@ -1,0 +1,25 @@
+--- a/server/sock.c
++++ b/server/sock.c
+@@ -2723,6 +2723,22 @@
+             set_error( STATUS_INVALID_ADDRESS );
+             return;
+         }
++        /* Windows rejects a stream connect() to destination port 0 with
++         * WSAEADDRNOTAVAIL. Unix instead accepts it on loopback as a TCP
++         * self-connect, which breaks apps that use a port-0 URL as an
++         * intercept sentinel: the in-game Battle.net web login redirects
++         * the embedded browser to http://localhost:0/?ST=<ticket>, expecting
++         * the navigation to fail fast so the ST is harvested from the failed
++         * URL. Under Wine the IPv4 self-connect succeeds instead, no load
++         * error fires, the ST is never consumed and login hangs forever.
++         * Match Windows for stream sockets. */
++        if (sock->type == WS_SOCK_STREAM &&
++            ((unix_addr.addr.sa_family == AF_INET  && !unix_addr.in.sin_port) ||
++             (unix_addr.addr.sa_family == AF_INET6 && !unix_addr.in6.sin6_port)))
++        {
++            set_error( STATUS_INVALID_ADDRESS );
++            return;
++        }
+         if (sock->state == SOCK_UNCONNECTED) /* clear events */
+         {
+             sock->pending_events &= ~AFD_POLL_CONNECT_ERR;
