@@ -93,6 +93,12 @@ in {
       lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") (
         lib.optionalAttrs nvapi {DXVK_ENABLE_NVAPI = "1";}
         // lib.optionalAttrs hdr {DXVK_HDR = "1";}
+        # On winewayland, closing the game window destroys the wl_surface
+        # before the game releases its D3D12 swapchain, and vkd3d-proton then
+        # waits forever in present_wait for a frame the compositor never
+        # acknowledges, so the game never exits. Without present_wait it
+        # exits normally, at the cost of vkd3d-proton's latency limiting.
+        // lib.optionalAttrs wayland {VKD3D_DISABLE_EXTENSIONS = "VK_KHR_present_wait,VK_KHR_present_wait2";}
         // lib.optionalAttrs useSteam {
           WINE_LSTEAMCLIENT = "1";
           SteamAppId = appId;
