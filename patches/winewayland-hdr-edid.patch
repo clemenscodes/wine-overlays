@@ -1,0 +1,277 @@
+winewayland.drv: report the output EDID and HDR state to win32u
+
+winewayland.drv never filled gdi_monitor.edid or gdi_monitor.hdr_enabled, so on
+Wayland every monitor looked like an SDR display without EDID:
+
+- DisplayConfigGetDeviceInfo(DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO)
+  reported advancedColorSupported=0/advancedColorEnabled=0, i.e. "Windows HDR
+  is off", so games that check it (RE Engine titles) hide their HDR option.
+- DXVK's IDXGIOutput6::GetDesc1 found no EDID in the registry ("Failed to
+  parse display metadata + colorimetry info, using blank") and reported
+  placeholder primaries and luminance instead of the monitor's.
+
+Wayland has no protocol for the EDID, so it is read from sysfs, matched by the
+connector name the compositor gives the output (xdg_output/wl_output name,
+e.g. "DP-1" for /sys/class/drm/card1-DP-1/edid). HDR is reported as enabled
+when the EDID lists the SMPTE ST 2084 EOTF in its CTA-861 HDR Static Metadata
+block and the compositor offers the BT.2100 image description that
+winewayland already uses for VK_COLOR_SPACE_HDR10_ST2084_EXT swapchains.
+
+win32u: implement DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL. RE Engine
+games query it (packet type 11) to place SDR/paper white in their HDR output
+and got STATUS_INVALID_PARAMETER. With HDR enabled it reports the BT.2408
+reference white of 203 nits that Wayland compositors assume for BT.2100
+content, otherwise 80 nits, like Windows without HDR.
+
+winewayland.drv: describe HDR10 swapchains with a parametric BT.2100 PQ image
+description (named ST 2084 transfer function and BT.2020 primaries) when the
+compositor supports it, and fall back to Windows-BT.2100 otherwise. The
+Windows-BT.2100 description leaves the content luminance unknown; Hyprland
+then takes reference white (203 cd/m²) as the content peak, never tone maps
+and passes the game's highlights up to 10000 cd/m² unmapped to the display,
+where everything above the panel's limit clips to white. With the parametric
+description the content range is the full PQ range and the compositor tone
+maps it to the output, as it does for video players.
+
+diff --git a/dlls/win32u/sysparams.c b/dlls/win32u/sysparams.c
+index 6ed5b77..e5e9136 100644
+--- a/dlls/win32u/sysparams.c
++++ b/dlls/win32u/sysparams.c
+@@ -7984,8 +7984,35 @@ NTSTATUS WINAPI NtUserDisplayConfigGetDeviceInfo( DISPLAYCONFIG_DEVICE_INFO_HEAD
+     case DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_BASE_TYPE:
+     case DISPLAYCONFIG_DEVICE_INFO_GET_SUPPORT_VIRTUAL_RESOLUTION:
+     case DISPLAYCONFIG_DEVICE_INFO_SET_SUPPORT_VIRTUAL_RESOLUTION:
+-    case DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE:
+     case DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL:
++    {
++        DISPLAYCONFIG_SDR_WHITE_LEVEL *white_level = (DISPLAYCONFIG_SDR_WHITE_LEVEL *)packet;
++        struct monitor *monitor;
++
++        if (packet->size < sizeof(*white_level))
++            return STATUS_INVALID_PARAMETER;
++
++        if (!lock_display_devices( FALSE )) return STATUS_UNSUCCESSFUL;
++
++        LIST_FOR_EACH_ENTRY(monitor, &monitors, struct monitor, entry)
++        {
++            if (white_level->header.id != monitor->output_id) continue;
++            if (memcmp( &white_level->header.adapterId, &monitor->source->gpu->luid,
++                        sizeof(monitor->source->gpu->luid) ))
++                continue;
++
++            /* In units of 80 nits / 1000. With HDR on, SDR white sits at the
++             * BT.2408 reference white of 203 nits, as Wayland compositors
++             * assume for BT.2100 content; without HDR it is 80 nits. */
++            white_level->SDRWhiteLevel = monitor->hdr_enabled ? 203 * 1000 / 80 : 1000;
++            ret = STATUS_SUCCESS;
++            break;
++        }
++
++        unlock_display_devices();
++        return ret;
++    }
++    case DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE:
+     default:
+         FIXME( "Unimplemented packet type %u.\n", packet->type );
+         return STATUS_INVALID_PARAMETER;
+diff --git a/dlls/winewayland.drv/display.c b/dlls/winewayland.drv/display.c
+index 1d46d64..f8d9e04 100644
+--- a/dlls/winewayland.drv/display.c
++++ b/dlls/winewayland.drv/display.c
+@@ -31,7 +31,11 @@
+ 
+ #include "ntuser.h"
+ 
++#include <dirent.h>
++#include <fcntl.h>
+ #include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(waylanddrv);
+ 
+@@ -204,11 +208,74 @@ static void wayland_add_device_source(const struct gdi_device_manager *device_ma
+     device_manager->add_source(output_info->output->name, state_flags, dpi, param);
+ }
+ 
++/* Wayland has no way to get the EDID of an output, so look it up in sysfs by
++ * the connector name the compositor reports (e.g. "DP-1" for card1-DP-1). */
++static UINT read_output_edid(const char *name, unsigned char *edid, UINT size)
++{
++    char path[512];
++    struct dirent *de;
++    size_t name_len;
++    UINT len = 0;
++    DIR *dir;
++    int fd;
++
++    if (!name || !(dir = opendir("/sys/class/drm"))) return 0;
++    name_len = strlen(name);
++
++    while (!len && (de = readdir(dir)))
++    {
++        const char *dash = strchr(de->d_name, '-');
++        ssize_t ret;
++
++        if (strncmp(de->d_name, "card", 4) || !dash || strlen(dash + 1) != name_len ||
++            strcmp(dash + 1, name))
++            continue;
++
++        snprintf(path, sizeof(path), "/sys/class/drm/%s/edid", de->d_name);
++        if ((fd = open(path, O_RDONLY)) < 0) continue;
++        while (len < size && (ret = read(fd, edid + len, size - len)) > 0) len += ret;
++        close(fd);
++        if (len < 128) len = 0;
++    }
++
++    closedir(dir);
++    TRACE("name=%s edid_len=%u\n", name, len);
++    return len;
++}
++
++/* Whether the EDID has a CTA-861 HDR Static Metadata Data Block that lists
++ * the SMPTE ST 2084 (PQ) EOTF. */
++static BOOL edid_supports_pq(const unsigned char *edid, UINT len)
++{
++    UINT block, i;
++
++    for (block = 128; block + 128 <= len; block += 128)
++    {
++        const unsigned char *ext = edid + block;
++        UINT end = ext[2];
++
++        if (ext[0] != 0x02 || end < 4 || end > 127) continue;
++
++        for (i = 4; i < end; i += (ext[i] & 0x1f) + 1)
++        {
++            UINT tag = ext[i] >> 5, blen = ext[i] & 0x1f;
++
++            if (i + blen >= end) break;
++            /* Extended tag 0x06: HDR Static Metadata, EOTF bit 2: ST 2084 */
++            if (tag == 7 && blen >= 3 && ext[i + 1] == 0x06 && (ext[i + 2] & 0x04))
++                return TRUE;
++        }
++    }
++
++    return FALSE;
++}
++
+ static void wayland_add_device_monitor(const struct gdi_device_manager *device_manager,
+                                        void *param, struct output_info *output_info,
+                                        struct output_info *primary)
+ {
+     struct gdi_monitor monitor = {0};
++    unsigned char edid[4096];
+ 
+     SetRect(&monitor.rc_monitor, output_info->x, output_info->y,
+             output_info->x + output_info->output->current_mode->width,
+@@ -218,8 +285,17 @@ static void wayland_add_device_monitor(const struct gdi_device_manager *device_m
+     /* We don't have a direct way to get the work area in Wayland. */
+     monitor.rc_work = monitor.rc_monitor;
+ 
+-    TRACE("name=%s rc_monitor=rc_work=%s\n",
+-          output_info->output->name, wine_dbgstr_rect(&monitor.rc_monitor));
++    if ((monitor.edid_len = read_output_edid(output_info->output->name, edid, sizeof(edid))))
++        monitor.edid = edid;
++
++    /* Report HDR as enabled, like Windows with HDR switched on, when the
++     * monitor accepts PQ and the compositor takes BT.2100 PQ content. */
++    monitor.hdr_enabled = color_management_has_bt2100() &&
++                          edid_supports_pq(monitor.edid, monitor.edid_len);
++
++    TRACE("name=%s rc_monitor=rc_work=%s edid_len=%u hdr_enabled=%d\n",
++          output_info->output->name, wine_dbgstr_rect(&monitor.rc_monitor),
++          monitor.edid_len, monitor.hdr_enabled);
+ 
+     device_manager->add_monitor(&monitor, param);
+ }
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index b32a43f..a232e1b 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -37,6 +37,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(waylanddrv);
+ static struct wp_image_description_v1 *scrgb_desc;
+ static struct wp_image_description_v1 *bt2100_desc;
+ static BOOL color_manager_initialized;
++static BOOL has_parametric, has_windows_bt2100, has_tf_pq, has_primaries_bt2020;
+ 
+ static void image_description_failed(void *user_data, struct wp_image_description_v1 *desc,
+                                      uint32_t cause, const char *message)
+@@ -86,23 +87,48 @@ static void color_manager_supported_feature(void *data, struct wp_color_manager_
+         scrgb_desc = (void *)-1;
+         wp_image_description_v1_add_listener(desc, &image_description_listener, &scrgb_desc);
+     }
+-    if (feature == WP_COLOR_MANAGER_V1_FEATURE_WINDOWS_BT2100 && (desc = wp_color_manager_v1_create_windows_bt2100(manager)))
+-    {
+-        bt2100_desc = (void *)-1;
+-        wp_image_description_v1_add_listener(desc, &image_description_listener, &bt2100_desc);
+-    }
++    if (feature == WP_COLOR_MANAGER_V1_FEATURE_WINDOWS_BT2100) has_windows_bt2100 = TRUE;
++    if (feature == WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC) has_parametric = TRUE;
+ }
+ 
+ static void color_manager_supported_named_tf(void *data, struct wp_color_manager_v1 *manager, uint32_t tf)
+ {
++    if (tf == WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ) has_tf_pq = TRUE;
+ }
+ 
+ static void color_manager_supported_primaries(void *data, struct wp_color_manager_v1 *manager, uint32_t primaries)
+ {
++    if (primaries == WP_COLOR_MANAGER_V1_PRIMARIES_BT2020) has_primaries_bt2020 = TRUE;
+ }
+ 
+ static void color_manager_done(void *data, struct wp_color_manager_v1 *manager)
+ {
++    struct wp_image_description_creator_params_v1 *creator;
++    struct wp_image_description_v1 *desc = NULL;
++
++    /* HDR10 swapchains carry plain BT.2100 PQ. Describe them parametrically
++     * when possible: the compositor then knows the content spans the whole
++     * PQ range up to 10000 cd/m² and tone maps it to the output, as it does
++     * for video players. The Windows-BT.2100 description leaves the content
++     * luminance unknown, so compositors assume reference white as the peak,
++     * skip tone mapping and send the game's highlights to the display
++     * unmapped, where they clip. */
++    if (has_parametric && has_tf_pq && has_primaries_bt2020 &&
++        (creator = wp_color_manager_v1_create_parametric_creator(manager)))
++    {
++        wp_image_description_creator_params_v1_set_tf_named(creator, WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ);
++        wp_image_description_creator_params_v1_set_primaries_named(creator, WP_COLOR_MANAGER_V1_PRIMARIES_BT2020);
++        desc = wp_image_description_creator_params_v1_create(creator);
++    }
++    else if (has_windows_bt2100)
++        desc = wp_color_manager_v1_create_windows_bt2100(manager);
++
++    if (desc)
++    {
++        bt2100_desc = (void *)-1;
++        wp_image_description_v1_add_listener(desc, &image_description_listener, &bt2100_desc);
++    }
++
+     color_manager_initialized = TRUE;
+ }
+ 
+@@ -123,6 +149,11 @@ void color_management_init(void)
+     TRACE("Initialized image descriptors, scRGB %p BT.2100 %p\n", scrgb_desc, bt2100_desc);
+ }
+ 
++BOOL color_management_has_bt2100(void)
++{
++    return bt2100_desc != NULL;
++}
++
+ static void xdg_surface_handle_configure(void *private, struct xdg_surface *xdg_surface,
+                                          uint32_t serial)
+ {
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index 1cb525b..1cc6d34 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -330,6 +330,7 @@ void wayland_output_use_xdg_extension(struct wayland_output *output);
+ 
+ extern const struct wp_color_manager_v1_listener color_manager_listener;
+ void color_management_init(void);
++BOOL color_management_has_bt2100(void);
+ 
+ struct wayland_surface *wayland_surface_create(HWND hwnd);
+ void wayland_surface_destroy(struct wayland_surface *surface);

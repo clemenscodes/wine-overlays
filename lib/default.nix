@@ -1,4 +1,10 @@
-{pkgs, ...}: {
+{pkgs, ...}: let
+  gaming = import ./gaming.nix {inherit pkgs;};
+  steam = import ./steam.nix {inherit pkgs;};
+in {
+  inherit (gaming) mkGamingLauncher mkGameApp;
+  inherit (steam) withLsteamclient;
+
   mkWinePkgs = {
     final,
     prev,

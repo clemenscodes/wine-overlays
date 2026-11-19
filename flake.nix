@@ -45,7 +45,10 @@
     {
       inherit lib overlays;
       packages = {
-        ${system} = winePackages;
+        ${system} = winePackages // {
+          inherit (import ./lib/gaming.nix { inherit pkgs; }) vkd3d-proton-bin dxvk-nvapi-bin;
+          wine-11_19-steam = lib.withLsteamclient winePackages.wine-11_19;
+        };
       };
       devShells = {
         ${system} = {

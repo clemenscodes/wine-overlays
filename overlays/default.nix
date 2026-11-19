@@ -118,6 +118,10 @@ in {
       # managed window, so an external unmap is not silently reverted by the
       # next SetWindowPos. Repro + analysis in ~/.local/src/wine-external-unmap-repro.
       ../patches/0001-winex11-sync-win32-visibility-on-external-withdraw-map.patch
+      # winewayland: pass the output EDID (from sysfs) and the HDR state to
+      # win32u, so games see the monitor's HDR metadata and "HDR enabled" in
+      # DisplayConfigGetDeviceInfo. See the patch header.
+      ../patches/winewayland-hdr-edid.patch
     ];
   };
   wine =_final: prev: {
